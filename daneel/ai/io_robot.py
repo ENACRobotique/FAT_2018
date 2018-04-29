@@ -2,8 +2,10 @@ from enum import *
 import threading, serial
 
 import math
+import RPi.GPIO as GPIO
 
 from drivers.neato_xv11_lidar import lidar_points, read_v_2_4
+from drivers.vl6180x_laser import VL6180x, VL6180X_DEFAULT_I2C_ADDR, VL6180X_ERROR_NONE
 
 
 LIDAR_SERIAL_PATH = "/dev/ttyUSB0"
@@ -11,6 +13,8 @@ LIDAR_SERIAL_BAUDRATE = 115200
 
 BIT10_TO_BATTERY_FACTOR = 0.014774881516587679
 
+ORANGE_LASER_SHUTDOWN_GPIO_PIN = 13  # In board number Todo: change it
+INTER_LASER_DISTANCE = 100  # mm Todo : change it
 
 class ActuatorID(Enum):
     WATER_COLLECTOR_GREEN = 0  # Dynamixel (not the Dynamixel id ! But the id defined in base/InputOutputs.h/eMsgActuatorId)
@@ -38,6 +42,13 @@ class IO(object):
         self.battery_signal_voltage = None
         self.bee_arm_green_state = None
         self.bee_arm_orange_state = None
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(ORANGE_LASER_SHUTDOWN_GPIO_PIN, GPIO.OUT, initial=GPIO.LOW)
+        GPIO.output(ORANGE_LASER_SHUTDOWN_GPIO_PIN, GPIO.LOW)
+        self.green_laser = VL6180x(VL6180X_DEFAULT_I2C_ADDR)
+        self.green_laser.change_address(VL6180X_DEFAULT_I2C_ADDR + 1)
+        GPIO.output(ORANGE_LASER_SHUTDOWN_GPIO_PIN, GPIO.HIGH)
+        self.orange_laser = VL6180x(VL6180X_DEFAULT_I2C_ADDR)
         self.lidar_serial = serial.Serial(LIDAR_SERIAL_PATH, LIDAR_SERIAL_BAUDRATE)
         self.lidar_thread = threading.Thread(target=read_v_2_4, args=(self.lidar_serial,))
         self.lidar_thread.start()
@@ -55,6 +66,20 @@ class IO(object):
     @property
     def lidar_points(self):
         return lidar_points[:] # returns a copy of the lidar point to avoid modification while iterating over the array
+
+    @property
+    def green_laser_distance(self):
+        range = self.green_laser.range
+        if self.green_laser.range_status == VL6180X_ERROR_NONE:
+            return range
+        return None
+
+    @property
+    def orange_laser_distance(self):
+        range = self.orange_laser.range
+        if self.orange_laser.range_status == VL6180X_ERROR_NONE:
+            return range
+        return None
 
     class SensorId(Enum):
         BATTERY_SIGNAL = 0
@@ -198,6 +223,13 @@ class IO(object):
         if self.robot.communication.send_actuator_command(ActuatorID.BEE_ARM_ORANGE.value, self.BeeArmState.LOWERED.value[1]) == 0:
             self.bee_arm_orange_state = self.BeeArmState.LOWERED
             print("[IO] Orange bee arm lowered")
+
+    def find_laser_angle(self):
+        range_green = self.green_laser_distance
+        range_orange = self.orange_laser_distance
+        if range_green is not None and range_orange is not None:
+            return math.atan((range_green - range_orange) / INTER_LASER_DISTANCE)
+        return None
 
     def _on_hmi_state_receive(self, cord_state, button1_state, button2_state, red_led_state, green_led_state, blue_led_state):
         self.cord_state = self.CordState.IN if cord_state else self.CordState.OUT

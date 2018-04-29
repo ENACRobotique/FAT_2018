@@ -1,3 +1,5 @@
 pyserial
 bitstring
 pyyaml
+smbus2
+RPi.GPIO
