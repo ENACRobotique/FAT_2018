@@ -23,20 +23,19 @@ def center_radians(value):
     return value
 
 
-class LocomotionState(Enum):
-    POSITION_CONTROL = 0
-    DIRECT_SPEED_CONTROL = 1
-    STOPPED = 2
-
-
 class Locomotion:
+    class LocomotionState(Enum):
+        POSITION_CONTROL = 0
+        DIRECT_SPEED_CONTROL = 1
+        STOPPED = 2
+
     def __init__(self, robot):
         self.robot = robot
         self.x = 0
         self.y = 0
         self.theta = 0
         self.previous_mode = None
-        self.mode = LocomotionState.POSITION_CONTROL
+        self.mode = self.LocomotionState.POSITION_CONTROL
 
         # Position Control
         # self.trajectory[0].goal_point must be equal to self.current_point_objective
@@ -44,8 +43,12 @@ class Locomotion:
         self.current_point_objective = None  # type: self.PointOrient
         self.position_control_speed_goal = 0
 
-        #Direct speed control
+        # Direct speed control
         self.direct_speed_goal = Speed(0, 0, 0)  # for DIRECT_SPEED_CONTROL_MODE
+
+        # Locomotion stopped
+        self.time_at_stop = 0  # 0 if not stopped, time.time() when locomotion enters in STOPPED mode.
+
         self.current_speed = Speed(0, 0, 0)  # type: Speed
         self.robot.communication.register_callback(self.robot.communication.eTypeUp.ODOM_REPORT,
                                                    self.handle_new_odometry_report)
@@ -96,7 +99,7 @@ class Locomotion:
                 del (self._odometry_reports[ids])
 
     def go_to_orient(self, x, y, theta):
-        self.mode = LocomotionState.POSITION_CONTROL
+        self.mode = self.LocomotionState.POSITION_CONTROL
         self.trajectory.clear()
         self.trajectory.append(GoalPoint(self.PointOrient(x, y, center_radians(theta)), 0.))
         self.current_point_objective = self.trajectory[0].goal_point
@@ -110,16 +113,16 @@ class Locomotion:
             return
         a = math.atan2(speed.vy, speed.vx)
         if self.robot.io.is_obstacle_in_cone(a, detection_angle, stop_distance):
-            if self.mode != LocomotionState.STOPPED:
+            if self.mode != self.LocomotionState.STOPPED:
                 self.stop()
         else:
-            if self.mode == LocomotionState.STOPPED:
+            if self.mode == self.LocomotionState.STOPPED:
                 self.restart()
 
     def is_at_point_orient(self, point=None):
         if point is None:
             point = self.current_point_objective
-        if self.mode != LocomotionState.POSITION_CONTROL and self.mode != LocomotionState.STOPPED:
+        if self.mode != self.LocomotionState.POSITION_CONTROL and self.mode != self.LocomotionState.STOPPED:
             return True
         if point is None:
             return True
@@ -139,12 +142,12 @@ class Locomotion:
             delta_time = control_time - self._last_position_control_time
         self._last_position_control_time = control_time
 
-        if self.mode == LocomotionState.STOPPED:
+        if self.mode == self.LocomotionState.STOPPED:
             speed = Speed(0, 0, 0)
 
-        elif self.mode == LocomotionState.POSITION_CONTROL:
+        elif self.mode == self.LocomotionState.POSITION_CONTROL:
             speed = self.position_control_loop(delta_time)
-        elif self.mode == LocomotionState.DIRECT_SPEED_CONTROL:
+        elif self.mode == self.LocomotionState.DIRECT_SPEED_CONTROL:
             if self.direct_speed_goal is not None:
                 speed = self.direct_speed_goal
             else:
@@ -157,10 +160,10 @@ class Locomotion:
         # print("Speed after saturation : " + str(self.current_speed))
 
         if obstacle_detection:
-            if self.mode == LocomotionState.STOPPED:
-                if self.previous_mode == LocomotionState.POSITION_CONTROL:
+            if self.mode == self.LocomotionState.STOPPED:
+                if self.previous_mode == self.LocomotionState.POSITION_CONTROL:
                     wanted_speed = self.position_control_loop(delta_time)
-                elif self.previous_mode == LocomotionState.DIRECT_SPEED_CONTROL:
+                elif self.previous_mode == self.LocomotionState.DIRECT_SPEED_CONTROL:
                     wanted_speed = self.direct_speed_goal
                 else:
                     wanted_speed = Speed(0, 0, 0)
@@ -173,17 +176,19 @@ class Locomotion:
         self.robot.communication.send_speed_command(*self.current_speed)
 
     def stop(self):
+        self.time_at_stop = time.time()
         self.previous_mode = self.mode
-        self.mode = LocomotionState.STOPPED
+        self.mode = self.LocomotionState.STOPPED
 
     def restart(self):
+        self.time_at_stop = 0
         self.mode = self.previous_mode
 
     def set_direct_speed(self, x_speed, y_speed, theta_speed):
-        if self.mode == LocomotionState.STOPPED:
-            self.previous_mode = LocomotionState.DIRECT_SPEED_CONTROL
+        if self.mode == self.LocomotionState.STOPPED:
+            self.previous_mode = self.LocomotionState.DIRECT_SPEED_CONTROL
         else:
-            self.mode = LocomotionState.DIRECT_SPEED_CONTROL
+            self.mode = self.LocomotionState.DIRECT_SPEED_CONTROL
         self.direct_speed_goal = Speed(x_speed, y_speed, theta_speed)
 
     def position_control_loop(self, delta_time):
@@ -283,7 +288,7 @@ class Locomotion:
         :type points_list: list[tuple[int, int]]|list[Locomotion.PointOrient]
         :return:
         """
-        self.mode = LocomotionState.POSITION_CONTROL
+        self.mode = self.LocomotionState.POSITION_CONTROL
         self.trajectory.clear()
         if len(points_list) > 0:
             for i, pt in enumerate(points_list):

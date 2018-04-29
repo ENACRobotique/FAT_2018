@@ -17,7 +17,7 @@ class Color(Enum):
 
 class FSMMatch(Behavior):
     def __init__(self, robot):
-        self.robot = robot
+        super().__init__(robot)
         self.color = None
         self.start_time = None
         self.state = StatePreStartChecks(self)
@@ -272,9 +272,9 @@ class StateRepositionningYPreSwitch(FSMState):
 
         if self.repos_start_time != 0 and time.time() - self.repos_start_time >= 5:
             if self.behavior.color.GREEN == Color.GREEN:
-                self.robot.locomotion.reposition_robot(self.robot.locomotion.x, 1868, math.pi/6)  # TODO: Verify it
+                self.robot.locomotion.reposition_robot(self.robot.locomotion.x, 1868, math.pi/6)
             else:
-                self.robot.locomotion.reposition_robot(self.robot.locomotion.x, 1868, 5*math.pi/6)  # TODO: Verify it
+                self.robot.locomotion.reposition_robot(self.robot.locomotion.x, 1868, 5*math.pi/6)
             return StateSwitchTrajectory
 
     def deinit(self):
@@ -295,19 +295,43 @@ class StateSwitchTrajectory(FSMState):
 
     def test(self):
         if self.robot.locomotion.is_trajectory_finished():
-            if self.behavior.color == Color.GREEN:
-                self.robot.locomotion.go_to_orient(1060, 1940, -math.pi / 2)
-            else:
-                self.robot.locomotion.go_to_orient(1860, 1880, -math.pi / 2)
             return StateSwitch
+        elif self.robot.locomotion.mode == self.robot.locomotion.LocomotionState.STOPPED and \
+                        time.time() - self.robot.locomotion.time_at_stop >= 7:
+            return StateSwitchTrajectoryAlternative
 
     def deinit(self):
         pass
 
 
+class StateSwitchTrajectoryAlternative(FSMState):
+    def __init__(self, behavior):
+        super().__init__(behavior)
+        if self.behavior.color == Color.GREEN:
+            self.robot.io.raise_bee_arm_green()
+            self.robot.locomotion.follow_trajectory([(210, 1160, -math.pi/2),
+                                                     (1060, 1160, -math.pi/2),
+                                                     (1060, 1800, -math.pi/2)])
+        else:
+            self.robot.io.raise_bee_arm_orange()
+            self.robot.locomotion.follow_trajectory([(2790, 1160, -math.pi/2),
+                                                     (1860, 1160, -math.pi/2),
+                                                     (1860, 1800, -math.pi/2)])
+
+    def test(self):
+        if self.robot.locomotion.is_trajectory_finished():
+            return StateSwitch
+
+    def deinit(self):
+        pass
+
 class StateSwitch(FSMState):
     def __init__(self, behavior):
         super().__init__(behavior)
+        if self.behavior.color == Color.GREEN:
+            self.robot.locomotion.go_to_orient(1060, 1940, -math.pi / 2)
+        else:
+            self.robot.locomotion.go_to_orient(1860, 1880, -math.pi / 2)
 
     def test(self):
         if self.robot.locomotion.is_trajectory_finished():
