@@ -6,6 +6,7 @@ UP_MESSAGE_SIZE = 11  # maximum size of a up message (teensy -> raspi) in bytes
 UP_HEADER_SIZE = 3  # size of the header (all except the data) of an up message
 DOWN_MESSAGE_SIZE = 9  # maximum size of a down message (raspi -> teensy) in bytes
 
+# Data converters (from and to what is sent over the wire and what is used as data).
 LINEAR_ODOM_TO_MSG_ADDER = 32768
 LINEAR_SPEED_TO_MSG_ADDER = 32768
 ANGULAR_SPEED_TO_MSG_FACTOR = 1043.0378350470453
@@ -15,13 +16,26 @@ RADIAN_TO_MSG_ADDER = 3.14159265358979323846
 
 
 class DeserializationException(Exception):
+    """
+    Raised on deserialization error (when trying to read what is sent over the wire into usable data)
+    """
     def __init__(self, message):
+        """
+        Ctor of the deserialization exception.
+
+        :param message: Message that will be thrown with the exception (and may be printed on the user screen)
+        :type message: str
+        """
         super().__init__(message)
 
 
 # ======= Up (Prop -> raspi) message declaration ======== #
 
 class eTypeUp(Enum):
+    """
+    All the message types that can be sent from the base (Teensy) to the ai.
+    Must be the same as base/code/communication/Communication.h:eUpMessageType
+    """
     ACK_DOWN = 0
     ODOM_REPORT = 1
     HMI_STATE = 2
@@ -29,14 +43,32 @@ class eTypeUp(Enum):
 
 
 class sAckDown:
+    """
+    Payload of an up message (from base to ai) acknowledging a down message (from ai to base).
+    """
     def __init__(self):
+        """
+        Ctor
+        """
         self.ack_down_id = None  # uint:8
 
     def deserialize(self, bytes_packed):
+        """
+        Fills the id of the acknowledged message with no alteration from what is received from the wire.
+
+        :param bytes_packed: The bytes received from serial.
+        :type bytes_packed: list[bytes]
+        """
         s = bitstring.BitStream(bytes_packed)
         self.ack_down_id, = s.unpack('uint:8')
 
     def serialize(self):
+        """
+        Not used.
+
+        :return:
+        :rtype:
+        """
         return bitstring.pack('uint:8', self.ack_down_id)
 
 

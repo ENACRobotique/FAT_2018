@@ -1,3 +1,8 @@
+"""
+Created on 29 July 2012
+@author: Guilhem Buisan
+"""
+
 import threading
 import serial
 import time
@@ -10,9 +15,13 @@ SERIAL_SEND_TIMEOUT = 500  # ms
 
 
 class Communication:
+    """
+    Class handling communication between ai and the Teensy.
+    """
     def __init__(self, serial_path=SERIAL_PATH, baudrate=SERIAL_BAUDRATE):
         """
         ctor of the communication class
+
         :param serial_path: The path of the serial file
         :type serial_path: str
         :param baudrate: The baudrate of UART (must the same as the one on the other board)
@@ -28,11 +37,46 @@ class Communication:
         self.eTypeUp = eTypeUp  # For exposure purposes
 
     def register_callback(self, message_type, callback):
+        """
+        Use this function to register a function which will be called when a certain message type will
+        be received from the Teensy.
+        The type of the callbacks must be:
+
+        ============ =============
+        message_type callback type
+        ============ =============
+        ODOM_REPORT  (previous_report_id [int], new_report_id [int], dx [float], dy [float], dtheta [float]) -> void
+        HMI_STATE    (cord_state [bool], button1_state [bool], button2_state [bool], red_led_state [bool],
+                     green_led_state [bool], blue_led_state [bool]) -> void
+        SENSOR_VALUE (sensor_id, sensor_value) -> void
+        ============ =============
+
+        :param message_type: The type of the message, which, when received, will trigger the callback.
+        :type message_type: eTypeUp
+        :param callback: Function which will be called.
+        :type callback: function
+        """
         if message_type not in self._callbacks:
             return
         self._callbacks[message_type].append(callback)
 
     def send_speed_command(self, vx, vy, vtheta, max_retries=1000):
+        """
+        Used to send a speed command to the teensy. The command must be in table frame ! (for vx and vtheta constant,
+        the robot makes a straight line while rotating on itself and does not make a circle (which it would do if it was
+        in robot frame.))
+
+        :param vx: speed along the table x axis.
+        :type vx: float
+        :param vy: speed along the table y axis.
+        :type vy: float
+        :param vtheta: rotation speed (direct with z ascending)
+        :type vtheta: float
+        :param max_retries: number of times to retry if the sending fails (default = 1000)
+        :type max_retries: int
+        :return: 0 if the message is sent, -1 if max_retries has been reached
+        :rtype: int
+        """
         msg = sMessageDown()
         msg.type = eTypeDown.SPEED_COMMAND
         msg.data = sSpeedCommand()
@@ -43,16 +87,19 @@ class Communication:
 
     def send_hmi_command(self, red_led_cmd, green_led_cmd, blue_led_cmd, max_retries=1000):
         """
-        /!\ Blocking command (try to send the message until it has been received)
+        /!\\ Blocking command (try to send the message until it has been received or max_retries)
         Send an HMI (LED) command to the teensy.
+
         :param red_led_cmd: Red value (0 - 255, then casted to 3 bits)
         :type red_led_cmd: int
         :param green_led_cmd: Green value (0 - 255, then casted to 3 bits)
         :type green_led_cmd: int
         :param blue_led_cmd: Blue value (0 - 255, then casted to 2 bits)
         :type blue_led_cmd: int
+        :param max_retries: number of times to retry if the sending fails (default = 1000)
+        :type max_retries: int
         :return: 0 if message has been sent, -1 if max retries has been reached
-        :rtype:
+        :rtype: int
         """
         msg = sMessageDown()
         msg.type = eTypeDown.HMI_COMMAND
@@ -62,6 +109,19 @@ class Communication:
         return self.send_message(msg, max_retries)
 
     def send_actuator_command(self, actuator_id, actuator_value, max_retries=1000):
+        """
+        Send an actuator command to the Teensy.
+
+        :param actuator_id: The actuator id as defined in base/code/InputOutputs.h:eMsgActuatorId. (0-255)
+        :type actuator_id: int
+        :param actuator_value: The value of the actuator. Behavior depends on the actuator and what is set
+            in the base/code/InputOutputs.cpp:handleActuatorMessage function. (0-65535)
+        :type actuator_value: int
+        :param max_retries: number of times to retry if the sending fails (default = 1000)
+        :type max_retries: int
+        :return: 0 if the message is sent, -1 if max_retries has been reached
+        :rtype: int
+        """
         msg = sMessageDown()
         msg.type = eTypeDown.ACTUATOR_COMMAND
         msg.data = sActuatorCommand()
@@ -70,6 +130,20 @@ class Communication:
         return self.send_message(msg, max_retries)
 
     def send_sensor_command(self, sensor_id, command_state, max_retries=1000):
+        """
+        Change a sensor state by sending a command to Teensy.
+
+        :param sensor_id: The sensor id as defined in the base/code/InputOutputs.h:sensors array (which is filled
+            in base/code/InputOutputs.h:initSensors function).
+        :type sensor_id: int
+        :param command_state: The state to enable on the sensor. As defined in
+            base/code/InputOutputs.h:sSensor::eSensorReadState.
+        :type command_state: int
+        :param max_retries: number of times to retry if the sending fails (default = 1000)
+        :type max_retries: int
+        :return: 0 if the message is sent, -1 if max_retries has been reached
+        :rtype: int
+        """
         msg = sMessageDown()
         msg.type = eTypeDown.SENSOR_COMMAND
         msg.data = sSensorCommand()
@@ -78,6 +152,15 @@ class Communication:
         return self.send_message(msg, max_retries)
 
     def reset_soft_teensy(self, max_retries=1000):
+        """
+        Send a reset order to the Teensy. This message will be accepted by the Teensy whatever the id (so even
+        after a desynchronisation between Teensy and ai, eg. when the ai reboots and not the Teensy)
+
+        :param max_retries: number of times to retry if the sending fails (default = 1000)
+        :type max_retries: int
+        :return: 0 if the message is sent, -1 if max_retries has been reached
+        :rtype: int
+        """
         if self.mock_communication:
             print("[Communication] Warning : Teensy communication mocked !")
             return 0
@@ -92,7 +175,17 @@ class Communication:
             self._mailbox = deque()
         return ret
 
-    def send_theta_repositionning(self, theta, max_retries=1000):
+    def send_theta_repositioning(self, theta, max_retries=1000):
+        """
+        Send an angular repositioning command to the Teensy,
+
+        :param theta: the angle of the robot (direct around an ascending z axis, and from x table axis.)
+        :type theta: float
+        :param max_retries: number of times to retry if the sending fails (default = 1000)
+        :type max_retries: int
+        :return: 0 if the message is sent, -1 if max_retries has been reached
+        :rtype: int
+        """
         msg = sMessageDown()
         msg.type = eTypeDown.THETA_REPOSITIONING
         msg.data = sThetaRepositioning()
@@ -102,6 +195,7 @@ class Communication:
     def send_message(self, msg, max_retries=1000):
         """
         Send message via Serial (defined during the instantiation of the class)
+
         :param msg: the message to send
         :type msg: sMessageDown
         :param max_retries: the maximum number of resend (on timeout = SERIAL_SEND_TIMEOUT or on NON_ACK) before failing
@@ -177,6 +271,7 @@ class Communication:
         """
         Check if there is any incoming message on the Serial (defined during the instantiation of the class)
         and returns the oldest message.
+
         :return: The oldest message non read
         :rtype: sMessageUp
         """
@@ -207,11 +302,11 @@ class Communication:
 
     def handle_message(self, message):
         """
+        Call registered callbacks with well formed arguments depending on message.type.
 
-        :param message:
+        :param message: The message to be handled (containing the type and the arguments to be passed
+            to the callback.
         :type message: sMessageUp
-        :return:
-        :rtype:
         """
         if message.type == eTypeUp.SENSOR_VALUE:
             for cb in self._callbacks[eTypeUp.SENSOR_VALUE]:

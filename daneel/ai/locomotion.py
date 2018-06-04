@@ -363,7 +363,7 @@ class Locomotion:
     def reposition_robot(self, x, y, theta):
         self.x = x
         self.y = y
-        if self.robot.communication.send_theta_repositionning(theta) == 0:
+        if self.robot.communication.send_theta_repositioning(theta) == 0:
             self.theta = theta
 
     def follow_trajectory(self, points_list):
