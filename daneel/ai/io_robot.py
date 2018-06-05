@@ -212,7 +212,7 @@ class IO(object):
         self.cord_state = self.CordState.IN if cord_state else self.CordState.OUT
         self.button1_state = self.ButtonState.RELEASED if button1_state else self.ButtonState.PRESSED
         self.button2_state = self.ButtonState.RELEASED if button2_state else self.ButtonState.PRESSED
-        self.led_color = self.LedColor((red_led_state, green_led_state, blue_led_state))
+        self.led_color = self.LedColor((255 if red_led_state else 0, 255 if green_led_state else 0, 255 if blue_led_state else 0))
 
     def _on_sensor_value_receive(self, sensor_id, sensor_value):
         if sensor_id == self.SensorId.BATTERY_SIGNAL.value:

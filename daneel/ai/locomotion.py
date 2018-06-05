@@ -59,13 +59,14 @@ class Locomotion:
         self.repositioning_final_position = (0, 0)
 
         self.current_speed = Speed(0, 0, 0)  # type: Speed
+        self.real_speed = Speed(0, 0, 0)  # type: Speed
         self.robot.communication.register_callback(self.robot.communication.eTypeUp.ODOM_REPORT,
                                                    self.handle_new_odometry_report)
         self._last_position_control_time = None
         self._odometry_reports = {}  # type: dict[(int, int): (float, float, float)]
         self._latest_odometry_report = 0
 
-    def handle_new_odometry_report(self, old_report_id, new_report_id, dx, dy, dtheta):
+    def handle_new_odometry_report(self, old_report_id, new_report_id, dx, dy, dtheta, vx, vy, vtheta):
         if (new_report_id - self._latest_odometry_report + 256) % 256 < 128:
             if old_report_id - self._latest_odometry_report > 128:
                 #  Need to find previous report and add the new information
@@ -83,12 +84,16 @@ class Locomotion:
                 self.y += dy
                 self.theta = center_radians(self.theta + dtheta)
 
+                self.real_speed = Speed(vx, vy, vtheta)
+
                 self._odometry_reports[(old_report_id, new_report_id)] = (dx, dy, dtheta)
             elif old_report_id == self._latest_odometry_report:
                 # Nominal case, the new report brings only new information
                 self.x += dx
                 self.y += dy
                 self.theta = center_radians(self.theta + dtheta)
+
+                self.real_speed = Speed(vx, vy, vtheta)
 
                 self._odometry_reports[(old_report_id, new_report_id)] = (dx, dy, dtheta)
             else:

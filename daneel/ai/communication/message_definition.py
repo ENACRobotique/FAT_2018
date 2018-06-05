@@ -2,7 +2,7 @@ from enum import Enum
 import bitstring
 
 
-UP_MESSAGE_SIZE = 11  # maximum size of a up message (teensy -> raspi) in bytes
+UP_MESSAGE_SIZE = 17  # maximum size of a up message (teensy -> raspi) in bytes
 UP_HEADER_SIZE = 3  # size of the header (all except the data) of an up message
 DOWN_MESSAGE_SIZE = 9  # maximum size of a down message (raspi -> teensy) in bytes
 
@@ -79,6 +79,9 @@ class sOdomReport:
         self._dx = None  # uint:16
         self._dy = None  # uint:16
         self._dtheta = None  # uint:16
+        self._vx = None
+        self._vy = None
+        self._vtheta = None
 
     @property
     def dx(self):
@@ -104,10 +107,23 @@ class sOdomReport:
     def dtheta(self, dtheta):
         self._dtheta = (dtheta + RADIAN_TO_MSG_ADDER) * RADIAN_TO_MSG_FACTOR
 
+    @property
+    def vx(self):
+        return self._vx - LINEAR_SPEED_TO_MSG_ADDER
+
+    @property
+    def vy(self):
+        return self._vy - LINEAR_SPEED_TO_MSG_ADDER
+
+    @property
+    def vtheta(self):
+        return self._vtheta / ANGULAR_SPEED_TO_MSG_FACTOR - ANGULAR_SPEED_TO_MSG_ADDER
+
     def deserialize(self, bytes_packed):
         s = bitstring.BitStream(bytes_packed)
-        self.previous_report_id, self.new_report_id, self._dx, self._dy, self._dtheta = s.unpack(
-            'uint:8, uint:8, uintle:16, uintle:16, uintle:16')
+        self.previous_report_id, self.new_report_id, self._dx, self._dy, self._dtheta, self._vx,\
+            self._vy, self._vtheta = s.unpack(
+            'uint:8, uint:8, uintle:16, uintle:16, uintle:16, uintle:16, uintle:16, uintle:16')
 
     def serialize(self):
         return bitstring.pack('uint:8, uint:8, uintle:16, uintle:16, uintle:16',

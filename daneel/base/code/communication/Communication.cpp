@@ -56,7 +56,8 @@ int Communication::sendSensorValue(const int sensorId, const int sensorValue){
 	return sendUpMessage(msg);
 }
 
-int Communication::sendOdometryReport(const int dx, const int dy, const double dtheta){
+int Communication::sendOdometryReport(const int dx, const int dy, const double dtheta, const double vx,
+		const double vy, const double vtheta){
 	sMessageUp msg;
 	sOdomReportStorage odomReport;
 	int cumuleddx = dx, cumuleddy = dy;
@@ -79,6 +80,9 @@ int Communication::sendOdometryReport(const int dx, const int dy, const double d
 	int msgdx = cumuleddx + linearOdomToMsgAdder;
 	int msgdy = cumuleddy + linearOdomToMsgAdder;
 	int msgdtheta = round((cumuleddtheta + radianToMsgAdder) * radianToMsgFactor);
+	int msgvx = vx + linearSpeedToMsgAdder;
+	int msgvy = vy + linearSpeedToMsgAdder;
+	int msgvtheta = round((vtheta + angularSpeedToMsgAdder) * angularSpeedToMsgFactor);
 
 	if (msgdx < 0 || msgdx > 65535){
 		return -10;
@@ -95,6 +99,9 @@ int Communication::sendOdometryReport(const int dx, const int dy, const double d
 	msg.upData.odomReportMsg.dx = msgdx;
 	msg.upData.odomReportMsg.dy = msgdy;
 	msg.upData.odomReportMsg.dtheta = msgdtheta;
+	msg.upData.odomReportMsg.vx = msgvx;
+	msg.upData.odomReportMsg.vy = msgvy;
+	msg.upData.odomReportMsg.vtheta = msgvtheta;
 
 #if DEBUG_COMM
 	Serial.print("Sending Odom Report : from (");
@@ -107,6 +114,12 @@ int Communication::sendOdometryReport(const int dx, const int dy, const double d
 	Serial.print(cumuleddy);
 	Serial.print("; ");
 	Serial.print(cumuleddtheta);
+	Serial.print("; ");
+	Serial.print(vx);
+	Serial.print("; ");
+	Serial.print(vy);
+	Serial.print("; ");
+	Serial.print(vtheta);
 #endif
 
 	return sendUpMessage(msg);

@@ -324,7 +324,7 @@ class Communication:
 
             for cb in self._callbacks[eTypeUp.ODOM_REPORT]:
                 cb(message.data.previous_report_id, message.data.new_report_id, message.data.dx, message.data.dy,
-                   message.data.dtheta)
+                   message.data.dtheta, message.data.vx, message.data.vy, message.data.vtheta)
         elif message.type == eTypeUp.ACK_DOWN:
             pass
 

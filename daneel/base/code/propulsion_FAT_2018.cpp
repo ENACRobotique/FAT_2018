@@ -93,7 +93,8 @@ void loop()
 
 	if(posReportTme.check()) {
 		communication.sendOdometryReport(odometry.getMoveDelta()->pData[0], odometry.getMoveDelta()->pData[1],
-				odometry.getMoveDelta()->pData[2]);
+				odometry.getMoveDelta()->pData[2], odometry.getSpeed()->pData[0], odometry.getSpeed()->pData[1],
+				odometry.getSpeed()->pData[2]);
 		odometry.resetMoveDelta();
 	}
 
