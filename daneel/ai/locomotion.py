@@ -28,6 +28,7 @@ class LocomotionState(Enum):
     DIRECT_SPEED_CONTROL = 1
     STOPPED = 2
     REPOSITIONING = 3
+    VISUAL_SERVOING = 4
 
 
 class Locomotion:
